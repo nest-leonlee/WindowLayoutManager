@@ -1,0 +1,38 @@
+#pragma once
+#include "afxcmn.h"
+
+class CWindowLayoutManagerDlg : public CDialog
+{
+public:
+    CWindowLayoutManagerDlg(CWnd* pParent = NULL); // standard constructor
+
+public:
+    void addWindow(HWND hwnd);
+
+protected:
+    virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
+
+private:
+    // Dialog Data
+#ifdef AFX_DESIGN_TIME
+    enum { IDD = IDD_WINDOW_LAYOUT_MANAGER_DIALOG };
+#endif
+
+    HICON m_hIcon;
+    CListCtrl listWindow;
+
+protected:
+    virtual BOOL OnInitDialog();
+    afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
+    afx_msg void OnPaint();
+    afx_msg HCURSOR OnQueryDragIcon();
+    DECLARE_MESSAGE_MAP()
+    afx_msg void OnLvnGetdispinfoList(NMHDR *pNMHDR, LRESULT *pResult);
+    afx_msg void OnLvnDeleteitemList(NMHDR* pNMHDR, LRESULT* pResult);
+    afx_msg void OnBnClickedOk();
+    afx_msg void OnBnClickedScan();
+    afx_msg void OnBnClickedDelete();
+    afx_msg void OnBnClickedRestore();
+public:
+    afx_msg void OnLvnKeydownList(NMHDR *pNMHDR, LRESULT *pResult);
+};
