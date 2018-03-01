@@ -329,16 +329,7 @@ void CWindowLayoutManagerDlg::OnBnClickedRestore()
     {
         itemListData = (ListItemData *)listWindow.GetItemData(i);
 
-        ::SetWindowPos(
-            itemListData->hwnd,
-            NULL,
-            itemListData->wp.rcNormalPosition.left,
-            itemListData->wp.rcNormalPosition.top,
-            itemListData->wp.rcNormalPosition.right - itemListData->wp.rcNormalPosition.left,
-            itemListData->wp.rcNormalPosition.bottom - itemListData->wp.rcNormalPosition.top,
-            SWP_NOACTIVATE | SWP_NOZORDER);
-
-        ::ShowWindow(itemListData->hwnd, itemListData->wp.showCmd);
+        ::SetWindowPlacement(itemListData->hwnd, &itemListData->wp);
     }
 }
 
