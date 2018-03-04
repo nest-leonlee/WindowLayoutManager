@@ -3,12 +3,16 @@
 #include "WindowLayoutManagerDlg.h"
 #include "AboutDlg.h"
 #include "SystemTray.h"
+#include "SingleProcess.h"
+
 #include <list>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
+namespace
+{
 struct ListItemData
 {
     HWND hwnd;
@@ -22,10 +26,11 @@ enum
 };
 
 unsigned int WM_TASK_RESTARTED = ::RegisterWindowMessage(_T("TaskbarCreated"));
+unsigned int WM_SINGLE_PROCESS = SingleProcess::getMsg();
+} // namespace anonymous
 
 CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
     : CDialog(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
-    , systemTray(new SystemTray)
 {
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -49,6 +54,7 @@ BEGIN_MESSAGE_MAP(CWindowLayoutManagerDlg, CDialog)
     ON_BN_CLICKED(IDC_RESTORE, &CWindowLayoutManagerDlg::OnBnClickedRestore)
     ON_NOTIFY(LVN_KEYDOWN, IDC_LIST, &CWindowLayoutManagerDlg::OnLvnKeydownList)
     ON_REGISTERED_MESSAGE(WM_TASK_RESTARTED, OnTaskRestarted)
+    ON_REGISTERED_MESSAGE(WM_SINGLE_PROCESS, OnSingleProcess)
     ON_MESSAGE(WM_TRAY_MESSAGE, OnTrayNotify)
     ON_WM_DESTROY()
 END_MESSAGE_MAP()
@@ -100,9 +106,7 @@ void CWindowLayoutManagerDlg::OnDestroy()
 {
     CDialog::OnDestroy();
 
-    systemTray->destroyTray();
-    delete systemTray;
-    systemTray = NULL;
+    systemTray.destroyTray();
 }
 
 void CWindowLayoutManagerDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -124,7 +128,7 @@ void CWindowLayoutManagerDlg::OnSysCommand(UINT nID, LPARAM lParam)
 
 void CWindowLayoutManagerDlg::minimizeToTray()
 {
-    systemTray->hideToTray();
+    systemTray.hideToTray();
 
     SetForegroundWindow();
 }
@@ -170,7 +174,7 @@ void CWindowLayoutManagerDlg::createTray()
     unsigned int iconId = IDR_MAINFRAME;
     HICON icon = (HICON)::LoadImage(theApp.m_hInstance, MAKEINTRESOURCE(iconId), IMAGE_ICON, 0, 0, 0);
 
-    if (!systemTray->createTray(GetSafeHwnd(), WM_TRAY_MESSAGE, IDS_TRAY_NOTIFY, _T("Window Layout Manager"), icon))
+    if (!systemTray.createTray(GetSafeHwnd(), WM_TRAY_MESSAGE, IDS_TRAY_NOTIFY, _T("Window Layout Manager"), icon))
     {
         ::DestroyIcon(icon);
     }
@@ -186,7 +190,7 @@ LRESULT CWindowLayoutManagerDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam)
         case WM_LBUTTONDBLCLK:
         {
             SetForegroundWindow();
-            systemTray->showFromTray();
+            systemTray.showFromTray();
             break;
         }
 
@@ -217,7 +221,7 @@ LRESULT CWindowLayoutManagerDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam)
 
 LRESULT CWindowLayoutManagerDlg::OnTaskRestarted(WPARAM wParam, LPARAM lParam)
 {
-    systemTray->recreateTray();
+    systemTray.recreateTray();
 
     return 0;
 }
@@ -230,6 +234,29 @@ BOOL CWindowLayoutManagerDlg::OnCommand(WPARAM wParam, LPARAM lParam)
     }
 
     return CDialog::OnCommand(wParam, lParam);
+}
+
+bool CWindowLayoutManagerDlg::setForceForegroundWindow(HWND aHwnd)
+{
+    bool sResult;
+
+    HWND aForegroundHwnd = ::GetForegroundWindow();
+
+    ::AttachThreadInput(::GetWindowThreadProcessId(aForegroundHwnd, NULL), ::GetCurrentThreadId(), TRUE);
+    sResult = ::SetForegroundWindow(aHwnd);
+    ::AttachThreadInput(::GetWindowThreadProcessId(aForegroundHwnd, NULL), ::GetCurrentThreadId(), FALSE);
+
+    return sResult;
+}
+
+LRESULT CWindowLayoutManagerDlg::OnSingleProcess(WPARAM wParam, LPARAM lParam)
+{
+    setForceForegroundWindow(m_hWnd);
+
+    CWnd::ShowWindow(::IsIconic(m_hWnd) ? SW_RESTORE : SW_SHOW);
+    UpdateWindow();
+
+    return 0;
 }
 
 BOOL CALLBACK enumWindowsProc(HWND hwnd, LPARAM lParam)

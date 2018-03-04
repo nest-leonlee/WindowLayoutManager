@@ -1,7 +1,6 @@
 #pragma once
 #include "afxcmn.h"
-
-class SystemTray;
+#include "SystemTray.h"
 
 class CWindowLayoutManagerDlg : public CDialog
 {
@@ -15,6 +14,8 @@ private:
     void createTray();
     void minimizeToTray();
 
+    bool setForceForegroundWindow(HWND aHwnd);
+
 protected:
     virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
     virtual BOOL OnCommand(WPARAM wParam, LPARAM lParam);
@@ -27,7 +28,7 @@ private:
 
     HICON m_hIcon;
     CListCtrl listWindow;
-    SystemTray *systemTray;
+    SystemTray systemTray;
 
 protected:
     virtual BOOL OnInitDialog();
@@ -45,6 +46,7 @@ protected:
     afx_msg void OnLvnKeydownList(NMHDR *pNMHDR, LRESULT *pResult);
     afx_msg LRESULT OnTrayNotify(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnTaskRestarted(WPARAM wParam, LPARAM lParam);
+    afx_msg LRESULT OnSingleProcess(WPARAM wParam, LPARAM lParam);
 public:
     afx_msg void OnDestroy();
 };

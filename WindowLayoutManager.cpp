@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "WindowLayoutManager.h"
 #include "WindowLayoutManagerDlg.h"
+#include "SingleProcess.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -41,6 +42,15 @@ BOOL CWindowLayoutManagerApp::InitInstance()
     // such as the name of your company or organization
     SetRegistryKey(_T("WindowLayoutManager"));
 
+    if (!SingleProcess::check())
+    {
+        SingleProcess::postMsg();
+
+        return FALSE;
+    }
+
+    SingleProcess::lock();
+
     CWindowLayoutManagerDlg dlg;
     m_pMainWnd = &dlg;
     INT_PTR nResponse = dlg.DoModal();
@@ -64,3 +74,9 @@ BOOL CWindowLayoutManagerApp::InitInstance()
     return FALSE;
 }
 
+int CWindowLayoutManagerApp::ExitInstance()
+{
+    SingleProcess::unlock();
+
+    return CWinApp::ExitInstance();
+}
