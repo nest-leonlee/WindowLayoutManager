@@ -2,6 +2,7 @@
 #include "WindowLayoutManager.h"
 #include "WindowLayoutManagerDlg.h"
 #include "AboutDlg.h"
+#include "SystemTray.h"
 #include <list>
 
 #ifdef _DEBUG
@@ -15,8 +16,16 @@ struct ListItemData
     DWORD pid;
 };
 
+enum
+{
+    WM_TRAY_MESSAGE = WM_USER + 1,
+};
+
+unsigned int WM_TASK_RESTARTED = ::RegisterWindowMessage(_T("TaskbarCreated"));
+
 CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
     : CDialog(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
+    , systemTray(new SystemTray)
 {
     m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -34,10 +43,14 @@ BEGIN_MESSAGE_MAP(CWindowLayoutManagerDlg, CDialog)
     ON_NOTIFY(LVN_GETDISPINFO, IDC_LIST, OnLvnGetdispinfoList)
     ON_NOTIFY(LVN_DELETEITEM, IDC_LIST, OnLvnDeleteitemList)
     ON_BN_CLICKED(IDOK, &CWindowLayoutManagerDlg::OnBnClickedOk)
+    ON_BN_CLICKED(IDCANCEL, &CWindowLayoutManagerDlg::OnBnClickedCancel)
     ON_BN_CLICKED(IDC_SCAN, &CWindowLayoutManagerDlg::OnBnClickedScan)
     ON_BN_CLICKED(IDC_DELETE, &CWindowLayoutManagerDlg::OnBnClickedDelete)
     ON_BN_CLICKED(IDC_RESTORE, &CWindowLayoutManagerDlg::OnBnClickedRestore)
     ON_NOTIFY(LVN_KEYDOWN, IDC_LIST, &CWindowLayoutManagerDlg::OnLvnKeydownList)
+    ON_REGISTERED_MESSAGE(WM_TASK_RESTARTED, OnTaskRestarted)
+    ON_MESSAGE(WM_TRAY_MESSAGE, OnTrayNotify)
+    ON_WM_DESTROY()
 END_MESSAGE_MAP()
 
 BOOL CWindowLayoutManagerDlg::OnInitDialog()
@@ -69,6 +82,8 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
     SetIcon(m_hIcon, TRUE);  // Set big icon
     SetIcon(m_hIcon, FALSE); // Set small icon
 
+    createTray();
+
     listWindow.SetExtendedStyle(listWindow.GetExtendedStyle() | LVS_EX_FULLROWSELECT);
     listWindow.InsertColumn(0, _T("Window title"), LVCFMT_LEFT, 300, -1);
     listWindow.InsertColumn(1, _T("HWND"),         LVCFMT_LEFT, 100, -1);
@@ -81,6 +96,15 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
+void CWindowLayoutManagerDlg::OnDestroy()
+{
+    CDialog::OnDestroy();
+
+    systemTray->destroyTray();
+    delete systemTray;
+    systemTray = NULL;
+}
+
 void CWindowLayoutManagerDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
     if ((nID & 0xFFF0) == IDM_ABOUTBOX)
@@ -88,10 +112,21 @@ void CWindowLayoutManagerDlg::OnSysCommand(UINT nID, LPARAM lParam)
         CAboutDlg dlg;
         dlg.DoModal();
     }
+    else if (nID == SC_CLOSE)
+    {
+        minimizeToTray();
+    }
     else
     {
         CDialog::OnSysCommand(nID, lParam);
     }
+}
+
+void CWindowLayoutManagerDlg::minimizeToTray()
+{
+    systemTray->hideToTray();
+
+    SetForegroundWindow();
 }
 
 // If you add a minimize button to your dialog, you will need the code below
@@ -128,6 +163,73 @@ void CWindowLayoutManagerDlg::OnPaint()
 HCURSOR CWindowLayoutManagerDlg::OnQueryDragIcon()
 {
     return static_cast<HCURSOR>(m_hIcon);
+}
+
+void CWindowLayoutManagerDlg::createTray()
+{
+    unsigned int iconId = IDR_MAINFRAME;
+    HICON icon = (HICON)::LoadImage(theApp.m_hInstance, MAKEINTRESOURCE(iconId), IMAGE_ICON, 0, 0, 0);
+
+    if (!systemTray->createTray(GetSafeHwnd(), WM_TRAY_MESSAGE, IDS_TRAY_NOTIFY, _T("Window Layout Manager"), icon))
+    {
+        ::DestroyIcon(icon);
+    }
+}
+
+LRESULT CWindowLayoutManagerDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam)
+{
+    if (wParam == IDS_TRAY_NOTIFY)
+    {
+        switch (lParam)
+        {
+        case WM_LBUTTONDOWN:
+        case WM_LBUTTONDBLCLK:
+        {
+            SetForegroundWindow();
+            systemTray->showFromTray();
+            break;
+        }
+
+        case WM_RBUTTONUP:
+        {
+            SetForegroundWindow();
+
+            CPoint pt;
+            ::GetCursorPos(&pt);
+
+            CMenu menu;
+            if (menu.LoadMenu(IDR_TRAY))
+            {
+                CMenu *popupMenu = (CMenu *)menu.GetSubMenu(0);
+                if (popupMenu)
+                {
+                    popupMenu->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, this);
+                }
+            }
+
+            break;
+        }
+        }
+    }
+
+    return 0;
+}
+
+LRESULT CWindowLayoutManagerDlg::OnTaskRestarted(WPARAM wParam, LPARAM lParam)
+{
+    systemTray->recreateTray();
+
+    return 0;
+}
+
+BOOL CWindowLayoutManagerDlg::OnCommand(WPARAM wParam, LPARAM lParam)
+{
+    if (wParam == ID_TRAY_APP_EXIT)
+    {
+        OnOK();
+    }
+
+    return CDialog::OnCommand(wParam, lParam);
 }
 
 BOOL CALLBACK enumWindowsProc(HWND hwnd, LPARAM lParam)
@@ -315,9 +417,11 @@ void CWindowLayoutManagerDlg::OnBnClickedDelete()
     }
 }
 
-void CWindowLayoutManagerDlg::OnBnClickedOk()
+void CWindowLayoutManagerDlg::OnBnClickedOk() {}
+
+void CWindowLayoutManagerDlg::OnBnClickedCancel()
 {
-    CDialog::OnOK();
+    minimizeToTray();
 }
 
 void CWindowLayoutManagerDlg::OnBnClickedRestore()
@@ -332,4 +436,3 @@ void CWindowLayoutManagerDlg::OnBnClickedRestore()
         ::SetWindowPlacement(itemListData->hwnd, &itemListData->wp);
     }
 }
-
