@@ -32,7 +32,7 @@ unsigned int WM_SINGLE_PROCESS = SingleProcess::getMsg();
 CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
     : CDialog(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
 {
-    m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+    iconApp = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
 
 void CWindowLayoutManagerDlg::DoDataExchange(CDataExchange* pDX)
@@ -85,8 +85,8 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
 
     // Set the icon for this dialog.  The framework does this automatically
     //  when the application's main window is not a dialog
-    SetIcon(m_hIcon, TRUE);  // Set big icon
-    SetIcon(m_hIcon, FALSE); // Set small icon
+    SetIcon(iconApp, TRUE);  // Set big icon
+    SetIcon(iconApp, FALSE); // Set small icon
 
     createTray();
 
@@ -154,7 +154,7 @@ void CWindowLayoutManagerDlg::OnPaint()
         int y = (rect.Height() - cyIcon + 1) / 2;
 
         // Draw the icon
-        dc.DrawIcon(x, y, m_hIcon);
+        dc.DrawIcon(x, y, iconApp);
     }
     else
     {
@@ -166,7 +166,7 @@ void CWindowLayoutManagerDlg::OnPaint()
 //  the minimized window.
 HCURSOR CWindowLayoutManagerDlg::OnQueryDragIcon()
 {
-    return static_cast<HCURSOR>(m_hIcon);
+    return static_cast<HCURSOR>(iconApp);
 }
 
 void CWindowLayoutManagerDlg::createTray()
@@ -189,7 +189,6 @@ LRESULT CWindowLayoutManagerDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam)
         case WM_LBUTTONDOWN:
         case WM_LBUTTONDBLCLK:
         {
-            SetForegroundWindow();
             systemTray.showFromTray();
             break;
         }
@@ -228,9 +227,15 @@ LRESULT CWindowLayoutManagerDlg::OnTaskRestarted(WPARAM wParam, LPARAM lParam)
 
 BOOL CWindowLayoutManagerDlg::OnCommand(WPARAM wParam, LPARAM lParam)
 {
-    if (wParam == ID_TRAY_APP_EXIT)
+    switch (wParam)
     {
+    case ID_TRAY_APP_SHOW:
+        systemTray.showFromTray();
+        break;
+
+    case ID_TRAY_APP_EXIT:
         OnOK();
+        break;
     }
 
     return CDialog::OnCommand(wParam, lParam);
@@ -238,15 +243,15 @@ BOOL CWindowLayoutManagerDlg::OnCommand(WPARAM wParam, LPARAM lParam)
 
 bool CWindowLayoutManagerDlg::setForceForegroundWindow(HWND aHwnd)
 {
-    bool sResult;
+    bool ret;
 
     HWND aForegroundHwnd = ::GetForegroundWindow();
 
     ::AttachThreadInput(::GetWindowThreadProcessId(aForegroundHwnd, NULL), ::GetCurrentThreadId(), TRUE);
-    sResult = ::SetForegroundWindow(aHwnd);
+    ret = ::SetForegroundWindow(aHwnd);
     ::AttachThreadInput(::GetWindowThreadProcessId(aForegroundHwnd, NULL), ::GetCurrentThreadId(), FALSE);
 
-    return sResult;
+    return ret;
 }
 
 LRESULT CWindowLayoutManagerDlg::OnSingleProcess(WPARAM wParam, LPARAM lParam)
@@ -462,4 +467,15 @@ void CWindowLayoutManagerDlg::OnBnClickedRestore()
 
         ::SetWindowPlacement(itemListData->hwnd, &itemListData->wp);
     }
+}
+
+BOOL CWindowLayoutManagerDlg::PreTranslateMessage(MSG* pMsg)
+{
+    if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_F5)
+    {
+        OnBnClickedScan();
+        return TRUE;
+    }
+
+    return CDialog::PreTranslateMessage(pMsg);
 }

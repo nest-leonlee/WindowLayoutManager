@@ -1,34 +1,30 @@
-#ifndef __SYSTEM_TRAY_H__
-#define __SYSTEM_TRAY_H__
 #pragma once
 
 class SystemTray
 {
 public:
-    SystemTray(void);
-    virtual ~SystemTray(void);
+    SystemTray();
+    virtual ~SystemTray();
 
 public:
-    bool createTray(HWND aHwnd, unsigned int aMsg, unsigned int aId, const TCHAR *aToolTip, HICON aIcon);
-    void destroyTray(void);
-    bool recreateTray(void);
+    bool createTray(HWND hwnd, unsigned int msg, unsigned int id, const TCHAR *tooltip, HICON icon);
+    void destroyTray();
+    bool recreateTray();
 
-    void showWindow(bool aShow, bool aAnimate = true);
-    void toggleWindow(bool aAnimate = true);
+    void showWindow(bool show, bool animate = true);
+    void toggleWindow(bool animate = true);
 
-    void showFromTray(bool aAnimate = true);
-    void hideToTray(bool aAnimate = true);
+    void showFromTray(bool animate = true);
+    void hideToTray(bool animate = true);
 
 public:
-    static void getTrayWndRect(LPRECT aRect);
+    static void getTrayWndRect(LPRECT rect);
 
 protected:
-    void animateMinimizeToTray(void);
-    void animateMaximizeFromTray(void);
+    void animateMinimizeToTray();
+    void animateMaximizeFromTray();
 
 protected:
-    HWND            m_hwnd;
-    NOTIFYICONDATA *m_notifyIconData;
+    HWND            hwnd;
+    NOTIFYICONDATA *notifyIconData;
 };
-
-#endif // __SYSTEM_TRAY_H__

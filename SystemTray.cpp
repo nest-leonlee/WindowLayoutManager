@@ -6,34 +6,34 @@
 #define new DEBUG_NEW
 #endif
 
-SystemTray::SystemTray(void)
-    : m_hwnd(NULL)
-    , m_notifyIconData(NULL)
+SystemTray::SystemTray()
+    : hwnd(NULL)
+    , notifyIconData(NULL)
 {
 }
 
-SystemTray::~SystemTray(void)
+SystemTray::~SystemTray()
 {
     destroyTray();
 }
 
-bool SystemTray::createTray(HWND aWnd, unsigned int aMsg, unsigned int aId, const TCHAR *aToolTip, HICON aIcon)
+bool SystemTray::createTray(HWND hwnd, unsigned int msg, unsigned int id, const TCHAR *tooltip, HICON icon)
 {
-    m_notifyIconData = new NOTIFYICONDATA;
+    notifyIconData = new NOTIFYICONDATA;
 
-    memset(m_notifyIconData, 0, sizeof(NOTIFYICONDATA));
-    m_notifyIconData->cbSize           = sizeof(NOTIFYICONDATA);
-    m_notifyIconData->uFlags           = NIF_ICON | NIF_TIP | NIF_MESSAGE;
-    m_notifyIconData->hWnd             = aWnd;
-    m_notifyIconData->hIcon            = aIcon;
-    m_notifyIconData->uCallbackMessage = aMsg;
-    m_notifyIconData->uID              = aId;
-    _tcscpy_s(m_notifyIconData->szTip, sizeof(m_notifyIconData->szInfo) / sizeof(m_notifyIconData->szInfo[0]), aToolTip);
+    memset(notifyIconData, 0, sizeof(NOTIFYICONDATA));
+    notifyIconData->cbSize           = sizeof(NOTIFYICONDATA);
+    notifyIconData->uFlags           = NIF_ICON | NIF_TIP | NIF_MESSAGE;
+    notifyIconData->hWnd             = hwnd;
+    notifyIconData->hIcon            = icon;
+    notifyIconData->uCallbackMessage = msg;
+    notifyIconData->uID              = id;
+    _tcscpy_s(notifyIconData->szTip, sizeof(notifyIconData->szInfo) / sizeof(notifyIconData->szInfo[0]), tooltip);
 
-    bool sResult = ::Shell_NotifyIcon(NIM_ADD, m_notifyIconData);
+    bool sResult = ::Shell_NotifyIcon(NIM_ADD, notifyIconData);
     if (sResult)
     {
-        m_hwnd = aWnd;
+        this->hwnd = hwnd;
     }
     else
     {
@@ -43,117 +43,117 @@ bool SystemTray::createTray(HWND aWnd, unsigned int aMsg, unsigned int aId, cons
     return sResult;
 }
 
-void SystemTray::destroyTray(void)
+void SystemTray::destroyTray()
 {
-    if (m_notifyIconData)
+    if (notifyIconData)
     {
-        ::Shell_NotifyIcon(NIM_DELETE, m_notifyIconData);
-        ::DestroyIcon(m_notifyIconData->hIcon);
-        delete m_notifyIconData;
-        m_notifyIconData = NULL;
-        m_hwnd = NULL;
+        ::Shell_NotifyIcon(NIM_DELETE, notifyIconData);
+        ::DestroyIcon(notifyIconData->hIcon);
+        delete notifyIconData;
+        notifyIconData = NULL;
+        hwnd = NULL;
     }
 }
 
-bool SystemTray::recreateTray(void)
+bool SystemTray::recreateTray()
 {
     NOTIFYICONDATA sNotifyIconData;
-    memcpy(&sNotifyIconData, m_notifyIconData, sizeof(NOTIFYICONDATA));
-    sNotifyIconData.hIcon = ::DuplicateIcon(theApp.m_hInstance, m_notifyIconData->hIcon);
+    memcpy(&sNotifyIconData, notifyIconData, sizeof(NOTIFYICONDATA));
+    sNotifyIconData.hIcon = ::DuplicateIcon(theApp.m_hInstance, notifyIconData->hIcon);
 
     destroyTray();
 
     return createTray(sNotifyIconData.hWnd, sNotifyIconData.uCallbackMessage, sNotifyIconData.uID, sNotifyIconData.szTip, sNotifyIconData.hIcon);
 }
 
-void SystemTray::showWindow(bool aShow, bool aAnimate)
+void SystemTray::showWindow(bool show, bool animate)
 {
-    if (aShow)
+    if (show)
     {
-        showFromTray(aAnimate);
+        showFromTray(animate);
     }
     else
     {
-        hideToTray(aAnimate);
+        hideToTray(animate);
     }
 }
 
-void SystemTray::toggleWindow(bool aAnimate)
+void SystemTray::toggleWindow(bool animate)
 {
-    if (::IsWindowVisible(m_hwnd) == FALSE)
+    if (::IsWindowVisible(hwnd) == FALSE)
     {
-        showFromTray(aAnimate);
+        showFromTray(animate);
     }
     else
     {
-        hideToTray(aAnimate);
+        hideToTray(animate);
     }
 }
 
-void SystemTray::showFromTray(bool aAnimate)
+void SystemTray::showFromTray(bool animate)
 {
-    ::SetForegroundWindow(m_hwnd);
+    ::SetForegroundWindow(hwnd);
 
-    unsigned int uStyle = CWnd::FromHandle(m_hwnd)->GetStyle();
+    unsigned int uStyle = CWnd::FromHandle(hwnd)->GetStyle();
     if ((uStyle & WS_MINIMIZE) == WS_MINIMIZE)
     {
-        ::ShowWindow(m_hwnd, SW_RESTORE);
+        ::ShowWindow(hwnd, SW_RESTORE);
     }
     else
     {
         animateMaximizeFromTray();
-        ::ShowWindow(m_hwnd, SW_SHOW);
+        ::ShowWindow(hwnd, SW_SHOW);
     }
 }
 
-void SystemTray::hideToTray(bool aAnimate)
+void SystemTray::hideToTray(bool animate)
 {
     animateMinimizeToTray();
-    ::ShowWindow(m_hwnd, SW_HIDE);
+    ::ShowWindow(hwnd, SW_HIDE);
 }
 
-void SystemTray::animateMinimizeToTray(void)
+void SystemTray::animateMinimizeToTray()
 {
     CRect sFromRect;
-    ::GetWindowRect(m_hwnd, &sFromRect);
+    ::GetWindowRect(hwnd, &sFromRect);
 
     CRect sToRect;
     getTrayWndRect(&sToRect);
 
-    ::DrawAnimatedRects(m_hwnd, IDANI_CAPTION, &sFromRect, &sToRect);
+    ::DrawAnimatedRects(hwnd, IDANI_CAPTION, &sFromRect, &sToRect);
 }
 
-void SystemTray::animateMaximizeFromTray(void)
+void SystemTray::animateMaximizeFromTray()
 {
     CRect sFromRect;
     getTrayWndRect(&sFromRect);
 
     // I cannot get window rectagle by GetWindowRect API function on minimized window state.
     WINDOWPLACEMENT sWindowPlacement;
-    ::GetWindowPlacement(m_hwnd, &sWindowPlacement);
+    ::GetWindowPlacement(hwnd, &sWindowPlacement);
 
-    ::DrawAnimatedRects(m_hwnd, IDANI_CAPTION, &sFromRect, &sWindowPlacement.rcNormalPosition);
+    ::DrawAnimatedRects(hwnd, IDANI_CAPTION, &sFromRect, &sWindowPlacement.rcNormalPosition);
 }
 
-void SystemTray::getTrayWndRect(LPRECT aRect)
+void SystemTray::getTrayWndRect(LPRECT rect)
 {
     HWND aTaskBarHwnd = ::FindWindow(_T("Shell_TrayWnd"), NULL);
     if (aTaskBarHwnd)
     {
         HWND sTrayHwnd = ::FindWindowEx(aTaskBarHwnd, NULL, _T("TrayNotifyWnd"), NULL);
         if (sTrayHwnd)
-            ::GetWindowRect(sTrayHwnd, aRect);
+            ::GetWindowRect(sTrayHwnd, rect);
         else
         {
-            ::GetWindowRect(aTaskBarHwnd, aRect);
-            aRect->left = aRect->right  - 20;
-            aRect->top  = aRect->bottom - 20;
+            ::GetWindowRect(aTaskBarHwnd, rect);
+            rect->left = rect->right  - 20;
+            rect->top  = rect->bottom - 20;
         }
     }
     else
     {
         int sWidth  = GetSystemMetrics(SM_CXSCREEN);
         int sHeight = GetSystemMetrics(SM_CYSCREEN);
-        SetRect(aRect, sWidth-40, sHeight-20, sWidth, sHeight);
+        SetRect(rect, sWidth-40, sHeight-20, sWidth, sHeight);
     }
 }

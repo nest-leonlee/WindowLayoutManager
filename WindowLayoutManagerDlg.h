@@ -1,4 +1,5 @@
 #pragma once
+
 #include "afxcmn.h"
 #include "SystemTray.h"
 
@@ -19,6 +20,7 @@ private:
 protected:
     virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
     virtual BOOL OnCommand(WPARAM wParam, LPARAM lParam);
+    virtual BOOL PreTranslateMessage(MSG* pMsg);
 
 private:
     // Dialog Data
@@ -26,7 +28,7 @@ private:
     enum { IDD = IDD_WINDOW_LAYOUT_MANAGER_DIALOG };
 #endif
 
-    HICON m_hIcon;
+    HICON iconApp;
     CListCtrl listWindow;
     SystemTray systemTray;
 
@@ -47,6 +49,5 @@ protected:
     afx_msg LRESULT OnTrayNotify(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnTaskRestarted(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnSingleProcess(WPARAM wParam, LPARAM lParam);
-public:
     afx_msg void OnDestroy();
 };

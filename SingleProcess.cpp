@@ -13,7 +13,7 @@ const unsigned int WM_SINGLE_PROCESS         = ::RegisterWindowMessage(_T("Windo
 
 HANDLE SingleProcess::singleProcessMutex = NULL;
 
-bool SingleProcess::check(void)
+bool SingleProcess::check()
 {
     HANDLE sSingleProcessMutex;
 
@@ -29,7 +29,7 @@ bool SingleProcess::check(void)
     return true;
 }
 
-void SingleProcess::lock(void)
+void SingleProcess::lock()
 {
     if (!singleProcessMutex)
     {
@@ -37,7 +37,7 @@ void SingleProcess::lock(void)
     }
 }
 
-void SingleProcess::unlock(void)
+void SingleProcess::unlock()
 {
     if (singleProcessMutex)
     {
@@ -46,12 +46,12 @@ void SingleProcess::unlock(void)
     }
 }
 
-unsigned int SingleProcess::getMsg(void)
+unsigned int SingleProcess::getMsg()
 {
     return WM_SINGLE_PROCESS;
 }
 
-void SingleProcess::postMsg(void)
+void SingleProcess::postMsg()
 {
     ::PostMessage(HWND_BROADCAST, WM_SINGLE_PROCESS, 0, 0);
 }
