@@ -50,6 +50,7 @@ BEGIN_MESSAGE_MAP(CWindowLayoutManagerDlg, CDialog)
     ON_BN_CLICKED(IDOK, &CWindowLayoutManagerDlg::OnBnClickedOk)
     ON_BN_CLICKED(IDCANCEL, &CWindowLayoutManagerDlg::OnBnClickedCancel)
     ON_BN_CLICKED(IDC_SCAN, &CWindowLayoutManagerDlg::OnBnClickedScan)
+    ON_BN_CLICKED(IDC_WHO, &CWindowLayoutManagerDlg::OnBnClickedWho)
     ON_BN_CLICKED(IDC_DELETE, &CWindowLayoutManagerDlg::OnBnClickedDelete)
     ON_BN_CLICKED(IDC_RESTORE, &CWindowLayoutManagerDlg::OnBnClickedRestore)
     ON_NOTIFY(LVN_KEYDOWN, IDC_LIST, &CWindowLayoutManagerDlg::OnLvnKeydownList)
@@ -449,6 +450,18 @@ void CWindowLayoutManagerDlg::OnBnClickedDelete()
     }
 }
 
+void CWindowLayoutManagerDlg::OnBnClickedWho()
+{
+    int index = listWindow.GetSelectionMark();
+    if (index < 0) return;
+
+    ListItemData *itemListData = (ListItemData *)listWindow.GetItemData(index);
+
+    ::SetForegroundWindow(itemListData->hwnd);
+    SetForegroundWindow();
+    ::FlashWindow(itemListData->hwnd, TRUE);
+}
+
 void CWindowLayoutManagerDlg::OnBnClickedOk() {}
 
 void CWindowLayoutManagerDlg::OnBnClickedCancel()
@@ -479,3 +492,4 @@ BOOL CWindowLayoutManagerDlg::PreTranslateMessage(MSG* pMsg)
 
     return CDialog::PreTranslateMessage(pMsg);
 }
+

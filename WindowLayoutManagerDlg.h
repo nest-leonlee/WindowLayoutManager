@@ -43,6 +43,7 @@ protected:
     afx_msg void OnBnClickedOk();
     afx_msg void OnBnClickedCancel();
     afx_msg void OnBnClickedScan();
+    afx_msg void OnBnClickedWho();
     afx_msg void OnBnClickedDelete();
     afx_msg void OnBnClickedRestore();
     afx_msg void OnLvnKeydownList(NMHDR *pNMHDR, LRESULT *pResult);
