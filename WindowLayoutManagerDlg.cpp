@@ -5,8 +5,6 @@
 #include "SystemTray.h"
 #include "SingleProcess.h"
 
-#include <list>
-
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -25,12 +23,39 @@ enum
     WM_TRAY_MESSAGE = WM_USER + 1,
 };
 
+enum
+{
+    TIMER_SCAN = 1,
+    TIMER_RESTORE,
+};
+
 unsigned int WM_TASK_RESTARTED = ::RegisterWindowMessage(_T("TaskbarCreated"));
 unsigned int WM_SINGLE_PROCESS = SingleProcess::getMsg();
+
+BOOL MonitorEnumProc(HMONITOR hMonitor, HDC dc, LPRECT rc, LPARAM lParam)
+{
+    MonitorList* list = reinterpret_cast<MonitorList*>(lParam);
+
+    MONITORINFOEX miex;
+    memset(&miex, 0, sizeof(miex));
+    miex.cbSize = sizeof(miex);
+    if (GetMonitorInfo(hMonitor, &miex))
+    {
+        list->push_back(miex);
+    }
+
+    return TRUE;
+}
+
+void getMonitorList(MonitorList& list)
+{
+    EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, (LPARAM)&list);
+}
 } // namespace anonymous
 
 CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
     : CDialog(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
+    , saved(false)
 {
     iconApp = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -57,7 +82,9 @@ BEGIN_MESSAGE_MAP(CWindowLayoutManagerDlg, CDialog)
     ON_REGISTERED_MESSAGE(WM_TASK_RESTARTED, OnTaskRestarted)
     ON_REGISTERED_MESSAGE(WM_SINGLE_PROCESS, OnSingleProcess)
     ON_MESSAGE(WM_TRAY_MESSAGE, OnTrayNotify)
+    ON_WM_DISPLAYCHANGE()
     ON_WM_DESTROY()
+    ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 BOOL CWindowLayoutManagerDlg::OnInitDialog()
@@ -242,15 +269,15 @@ BOOL CWindowLayoutManagerDlg::OnCommand(WPARAM wParam, LPARAM lParam)
     return CDialog::OnCommand(wParam, lParam);
 }
 
-bool CWindowLayoutManagerDlg::setForceForegroundWindow(HWND aHwnd)
+bool CWindowLayoutManagerDlg::setForceForegroundWindow(HWND hwnd)
 {
     bool ret;
 
-    HWND aForegroundHwnd = ::GetForegroundWindow();
+    HWND foregroundHwnd = ::GetForegroundWindow();
 
-    ::AttachThreadInput(::GetWindowThreadProcessId(aForegroundHwnd, NULL), ::GetCurrentThreadId(), TRUE);
-    ret = ::SetForegroundWindow(aHwnd);
-    ::AttachThreadInput(::GetWindowThreadProcessId(aForegroundHwnd, NULL), ::GetCurrentThreadId(), FALSE);
+    ::AttachThreadInput(::GetWindowThreadProcessId(foregroundHwnd, NULL), ::GetCurrentThreadId(), TRUE);
+    ret = ::SetForegroundWindow(hwnd);
+    ::AttachThreadInput(::GetWindowThreadProcessId(foregroundHwnd, NULL), ::GetCurrentThreadId(), FALSE);
 
     return ret;
 }
@@ -279,6 +306,10 @@ void CWindowLayoutManagerDlg::OnBnClickedScan()
 
     listWindow.DeleteAllItems();
     EnumWindows(enumWindowsProc, (LPARAM)this);
+
+    savedMonitorInfo.list.clear();
+    getMonitorList(savedMonitorInfo.list);
+    saved = true;
 
     listWindow.SetRedraw();
 }
@@ -336,7 +367,7 @@ void CWindowLayoutManagerDlg::OnLvnGetdispinfoList(NMHDR *pNMHDR, LRESULT *pResu
             break;
 
         case 1:
-            _stprintf_s(itemList.pszText, itemList.cchTextMax, _T("%X"), (int)itemListData->hwnd);
+            _stprintf_s(itemList.pszText, itemList.cchTextMax, _T("%llX"), reinterpret_cast<intptr_t>(itemListData->hwnd));
             break;
 
         case 2:
@@ -482,6 +513,84 @@ void CWindowLayoutManagerDlg::OnBnClickedRestore()
     }
 }
 
+void CWindowLayoutManagerDlg::OnDisplayChange(UINT nImageDepth, int cxScreen, int cyScreen)
+{
+    if (saved)
+    {
+        KillTimer(TIMER_RESTORE);
+        SetTimer(TIMER_RESTORE, 1000, NULL);
+    }
+}
+
+void CWindowLayoutManagerDlg::OnTimer(UINT_PTR nIDEvent)
+{
+    if (nIDEvent == TIMER_SCAN)
+    {
+        timerScan();
+        KillTimer(nIDEvent);
+        return;
+    }
+    else if (nIDEvent == TIMER_RESTORE)
+    {
+        timerRestore();
+        KillTimer(nIDEvent);
+        return;
+    }
+
+    CDialog::OnTimer(nIDEvent);
+}
+
+void CWindowLayoutManagerDlg::timerScan()
+{
+}
+
+bool operator==(const MonitorList& list1, const MonitorList& list2)
+{
+    auto itr1 = list1.cbegin();
+    auto itr2 = list2.cbegin();
+
+    while (itr1 != list1.cend())
+    {
+        if (_tcsncmp(itr1->szDevice, itr2->szDevice, CCHDEVICENAME) != 0)
+        {
+            return false;
+        }
+
+        if (itr1->rcMonitor.left != itr2->rcMonitor.left ||
+            itr1->rcMonitor.top != itr2->rcMonitor.top ||
+            itr1->rcMonitor.right != itr2->rcMonitor.right ||
+            itr1->rcMonitor.bottom != itr2->rcMonitor.bottom)
+        {
+            return false;
+        }
+
+        ++itr1;
+        ++itr2;
+    }
+
+    return true;
+}
+
+bool operator!=(const MonitorList& list1, const MonitorList& list2)
+{
+    return !(list1 == list2);
+}
+
+void CWindowLayoutManagerDlg::timerRestore()
+{
+    MonitorList list;
+    getMonitorList(list);
+
+    if (list.size() == savedMonitorInfo.list.size())
+    {
+        bool matched = (list == savedMonitorInfo.list);
+        if (matched)
+        {
+            OnBnClickedRestore();
+        }
+    }
+}
+
 BOOL CWindowLayoutManagerDlg::PreTranslateMessage(MSG* pMsg)
 {
     if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_F5)
@@ -492,4 +601,3 @@ BOOL CWindowLayoutManagerDlg::PreTranslateMessage(MSG* pMsg)
 
     return CDialog::PreTranslateMessage(pMsg);
 }
-

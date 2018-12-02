@@ -3,6 +3,10 @@
 #include "afxcmn.h"
 #include "SystemTray.h"
 
+#include <list>
+
+typedef std::list<MONITORINFOEX> MonitorList;
+
 class CWindowLayoutManagerDlg : public CDialog
 {
 public:
@@ -15,7 +19,19 @@ private:
     void createTray();
     void minimizeToTray();
 
-    bool setForceForegroundWindow(HWND aHwnd);
+    bool setForceForegroundWindow(HWND hwnd);
+
+    void timerScan();
+    void timerRestore();
+
+private:
+    struct MonitorInfo
+    {
+        MonitorList list;
+    };
+
+    bool saved;
+    MonitorInfo savedMonitorInfo;
 
 protected:
     virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
@@ -51,4 +67,7 @@ protected:
     afx_msg LRESULT OnTaskRestarted(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnSingleProcess(WPARAM wParam, LPARAM lParam);
     afx_msg void OnDestroy();
+    afx_msg void OnDisplayChange(UINT nImageDepth, int cxScreen, int cyScreen);
+public:
+    afx_msg void OnTimer(UINT_PTR nIDEvent);
 };
