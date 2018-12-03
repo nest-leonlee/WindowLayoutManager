@@ -2,13 +2,16 @@
 
 #include "afxcmn.h"
 #include "SystemTray.h"
+#include "ResizingDialog.h"
 
 #include <list>
 
 typedef std::list<MONITORINFOEX> MonitorList;
 
-class CWindowLayoutManagerDlg : public CDialog
+class CWindowLayoutManagerDlg : public CResizingDialog
 {
+    typedef CResizingDialog super;
+
 public:
     CWindowLayoutManagerDlg(CWnd* pParent = NULL); // standard constructor
 

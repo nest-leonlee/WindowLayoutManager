@@ -54,7 +54,7 @@ void getMonitorList(MonitorList& list)
 } // namespace anonymous
 
 CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
-    : CDialog(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
+    : super(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
     , saved(false)
 {
     iconApp = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
@@ -62,11 +62,11 @@ CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
 
 void CWindowLayoutManagerDlg::DoDataExchange(CDataExchange* pDX)
 {
-    CDialog::DoDataExchange(pDX);
+    super::DoDataExchange(pDX);
     DDX_Control(pDX, IDC_LIST, listWindow);
 }
 
-BEGIN_MESSAGE_MAP(CWindowLayoutManagerDlg, CDialog)
+BEGIN_MESSAGE_MAP(CWindowLayoutManagerDlg, super)
     ON_WM_SYSCOMMAND()
     ON_WM_PAINT()
     ON_WM_QUERYDRAGICON()
@@ -89,7 +89,7 @@ END_MESSAGE_MAP()
 
 BOOL CWindowLayoutManagerDlg::OnInitDialog()
 {
-    CDialog::OnInitDialog();
+    super::OnInitDialog();
 
     // Add "About..." menu item to system menu.
 
@@ -116,6 +116,20 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
     SetIcon(iconApp, TRUE);  // Set big icon
     SetIcon(iconApp, FALSE); // Set small icon
 
+    // CResizingDialog -------------------------------------------
+    //HideSizeIcon();
+
+    //sizeNone:     Don't resize at all
+    //sizeResize:   The control will be stretched in the appropriate direction
+    //sizeRepos:    The control will be moved in the appropriate direction
+    //sizeRelative: The control will be moved proportionally in the appropriate direction
+    AddControl(IDC_LIST,    sizeResize, sizeResize);
+    AddControl(IDC_SCAN,    sizeNone,   sizeRepos, FALSE);
+    AddControl(IDC_WHO,     sizeNone,   sizeRepos, FALSE);
+    AddControl(IDC_DELETE,  sizeNone,   sizeRepos, FALSE);
+    AddControl(IDC_RESTORE, sizeRepos,  sizeRepos, FALSE);
+    //------------------------------------------------------------
+
     createTray();
 
     listWindow.SetExtendedStyle(listWindow.GetExtendedStyle() | LVS_EX_FULLROWSELECT);
@@ -132,7 +146,7 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
 
 void CWindowLayoutManagerDlg::OnDestroy()
 {
-    CDialog::OnDestroy();
+    super::OnDestroy();
 
     systemTray.destroyTray();
 }
@@ -150,7 +164,7 @@ void CWindowLayoutManagerDlg::OnSysCommand(UINT nID, LPARAM lParam)
     }
     else
     {
-        CDialog::OnSysCommand(nID, lParam);
+        super::OnSysCommand(nID, lParam);
     }
 }
 
@@ -186,7 +200,7 @@ void CWindowLayoutManagerDlg::OnPaint()
     }
     else
     {
-        CDialog::OnPaint();
+        super::OnPaint();
     }
 }
 
@@ -266,7 +280,7 @@ BOOL CWindowLayoutManagerDlg::OnCommand(WPARAM wParam, LPARAM lParam)
         break;
     }
 
-    return CDialog::OnCommand(wParam, lParam);
+    return super::OnCommand(wParam, lParam);
 }
 
 bool CWindowLayoutManagerDlg::setForceForegroundWindow(HWND hwnd)
@@ -537,7 +551,7 @@ void CWindowLayoutManagerDlg::OnTimer(UINT_PTR nIDEvent)
         return;
     }
 
-    CDialog::OnTimer(nIDEvent);
+    super::OnTimer(nIDEvent);
 }
 
 void CWindowLayoutManagerDlg::timerScan()
@@ -599,5 +613,5 @@ BOOL CWindowLayoutManagerDlg::PreTranslateMessage(MSG* pMsg)
         return TRUE;
     }
 
-    return CDialog::PreTranslateMessage(pMsg);
+    return super::PreTranslateMessage(pMsg);
 }
