@@ -27,6 +27,8 @@ private:
     void timerScan();
     void timerRestore();
 
+    void lockScan(bool lock);
+
 private:
     struct MonitorInfo
     {
@@ -35,6 +37,8 @@ private:
 
     bool saved;
     MonitorInfo savedMonitorInfo;
+
+    bool locked;
 
 protected:
     virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
@@ -64,6 +68,7 @@ protected:
     afx_msg void OnBnClickedScan();
     afx_msg void OnBnClickedWho();
     afx_msg void OnBnClickedDelete();
+    afx_msg void OnBnClickedLock();
     afx_msg void OnBnClickedRestore();
     afx_msg void OnLvnKeydownList(NMHDR *pNMHDR, LRESULT *pResult);
     afx_msg LRESULT OnTrayNotify(WPARAM wParam, LPARAM lParam);
@@ -71,6 +76,5 @@ protected:
     afx_msg LRESULT OnSingleProcess(WPARAM wParam, LPARAM lParam);
     afx_msg void OnDestroy();
     afx_msg void OnDisplayChange(UINT nImageDepth, int cxScreen, int cyScreen);
-public:
     afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

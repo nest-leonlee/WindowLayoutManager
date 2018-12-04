@@ -56,6 +56,7 @@ void getMonitorList(MonitorList& list)
 CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
     : super(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
     , saved(false)
+    , locked(false)
 {
     iconApp = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -77,6 +78,7 @@ BEGIN_MESSAGE_MAP(CWindowLayoutManagerDlg, super)
     ON_BN_CLICKED(IDC_SCAN, &CWindowLayoutManagerDlg::OnBnClickedScan)
     ON_BN_CLICKED(IDC_WHO, &CWindowLayoutManagerDlg::OnBnClickedWho)
     ON_BN_CLICKED(IDC_DELETE, &CWindowLayoutManagerDlg::OnBnClickedDelete)
+    ON_BN_CLICKED(IDC_LOCK, &CWindowLayoutManagerDlg::OnBnClickedLock)
     ON_BN_CLICKED(IDC_RESTORE, &CWindowLayoutManagerDlg::OnBnClickedRestore)
     ON_NOTIFY(LVN_KEYDOWN, IDC_LIST, &CWindowLayoutManagerDlg::OnLvnKeydownList)
     ON_REGISTERED_MESSAGE(WM_TASK_RESTARTED, OnTaskRestarted)
@@ -140,6 +142,8 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
     listWindow.InsertColumn(4, _T("Position"),     LVCFMT_LEFT, 100, -1);
     listWindow.InsertColumn(5, _T("Size"),         LVCFMT_LEFT, 100, -1);
     listWindow.InsertColumn(6, _T("Show status"),  LVCFMT_LEFT, 200, -1);
+
+    lockScan(locked);
 
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -512,6 +516,26 @@ void CWindowLayoutManagerDlg::OnBnClickedOk() {}
 void CWindowLayoutManagerDlg::OnBnClickedCancel()
 {
     minimizeToTray();
+}
+
+void CWindowLayoutManagerDlg::OnBnClickedLock()
+{
+    lockScan(!locked);
+    locked = !locked;
+}
+
+void CWindowLayoutManagerDlg::lockScan(bool lock)
+{
+    if (lock)
+    {
+        GetDlgItem(IDC_SCAN)->EnableWindow(FALSE);
+        GetDlgItem(IDC_LOCK)->SetWindowText(_T("Un&lock"));
+    }
+    else
+    {
+        GetDlgItem(IDC_SCAN)->EnableWindow(TRUE);
+        GetDlgItem(IDC_LOCK)->SetWindowText(_T("&Lock"));
+    }
 }
 
 void CWindowLayoutManagerDlg::OnBnClickedRestore()
