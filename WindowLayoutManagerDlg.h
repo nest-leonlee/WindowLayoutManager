@@ -25,9 +25,10 @@ private:
     bool setForceForegroundWindow(HWND hwnd);
 
     void timerScan();
-    void timerRestore();
+    bool timerRestore();
 
     void lockScan(bool lock);
+    void restore();
 
 private:
     struct MonitorInfo
