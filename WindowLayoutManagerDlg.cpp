@@ -129,6 +129,7 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
     AddControl(IDC_SCAN,    sizeNone,   sizeRepos, FALSE);
     AddControl(IDC_WHO,     sizeNone,   sizeRepos, FALSE);
     AddControl(IDC_DELETE,  sizeNone,   sizeRepos, FALSE);
+    AddControl(IDC_LOCK,    sizeNone,   sizeRepos, FALSE);
     AddControl(IDC_RESTORE, sizeRepos,  sizeRepos, FALSE);
     //------------------------------------------------------------
 
