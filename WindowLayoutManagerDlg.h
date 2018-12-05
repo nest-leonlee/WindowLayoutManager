@@ -38,6 +38,7 @@ private:
 
     bool saved;
     MonitorInfo savedMonitorInfo;
+    int retryRestoring;
 
     bool locked;
 

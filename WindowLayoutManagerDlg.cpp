@@ -29,7 +29,7 @@ enum
     TIMER_RESTORE,
 };
 
-#define MAX_RESTORING 10
+#define MAX_RESTORING 5
 
 #define DEFAULT_CAPTION _T("Windows Layout Manager")
 
@@ -93,6 +93,7 @@ CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
     : super(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
     , saved(false)
     , locked(false)
+    , retryRestoring(0)
 {
     iconApp = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -614,6 +615,8 @@ void CWindowLayoutManagerDlg::OnDisplayChange(UINT nImageDepth, int cxScreen, in
     if (saved)
     {
         KillTimer(TIMER_RESTORE);
+
+        retryRestoring = 0;
         SetTimer(TIMER_RESTORE, 1000, NULL);
     }
 }
@@ -628,8 +631,21 @@ void CWindowLayoutManagerDlg::OnTimer(UINT_PTR nIDEvent)
     }
     else if (nIDEvent == TIMER_RESTORE)
     {
-        timerRestore();
-        KillTimer(nIDEvent);
+        if (timerRestore())
+        {
+            KillTimer(nIDEvent);
+        }
+        else
+        {
+            if (retryRestoring >= MAX_RESTORING)
+            {
+                // give up
+                KillTimer(nIDEvent);
+            }
+
+            ++retryRestoring;
+        }
+
         return;
     }
 
