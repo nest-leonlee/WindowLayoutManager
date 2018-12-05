@@ -578,6 +578,9 @@ void CWindowLayoutManagerDlg::lockScan(bool lock)
 
 void CWindowLayoutManagerDlg::OnBnClickedRestore()
 {
+    if (savedMonitorInfo.list.empty())
+        return;
+
     MonitorList list;
     getMonitorList(list);
 
