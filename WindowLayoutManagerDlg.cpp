@@ -600,13 +600,16 @@ void CWindowLayoutManagerDlg::OnBnClickedRestore()
 void CWindowLayoutManagerDlg::restore()
 {
     ListItemData *itemListData;
-    int i, count = listWindow.GetItemCount();
+    int i, retry, count = listWindow.GetItemCount();
 
-    for (i = 0; i < count; ++i)
+    for (retry = 0; retry < 2; ++retry) // sometimes smaller resizing in some window
     {
-        itemListData = (ListItemData *)listWindow.GetItemData(i);
+        for (i = 0; i < count; ++i)
+        {
+            itemListData = (ListItemData *)listWindow.GetItemData(i);
 
-        ::SetWindowPlacement(itemListData->hwnd, &itemListData->wp);
+            ::SetWindowPlacement(itemListData->hwnd, &itemListData->wp);
+        }
     }
 }
 
