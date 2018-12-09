@@ -13,7 +13,7 @@ class CWindowLayoutManagerDlg : public CResizingDialog
     typedef CResizingDialog super;
 
 public:
-    CWindowLayoutManagerDlg(CWnd* pParent = NULL); // standard constructor
+    CWindowLayoutManagerDlg(CWnd* pParent = nullptr); // standard constructor
 
 public:
     void addWindow(HWND hwnd);
@@ -24,11 +24,18 @@ private:
 
     bool setForceForegroundWindow(HWND hwnd);
 
-    void timerScan();
+    bool timerScan();
     bool timerRestore();
 
+    void scan();
     void lockScan(bool lock);
     void restore();
+
+    void setAutoScan(bool enable);
+
+    void updateStatus();
+    void updateStatusFlush(bool show);
+    void timerStatus();
 
 private:
     struct MonitorInfo
@@ -39,6 +46,10 @@ private:
     bool saved;
     MonitorInfo savedMonitorInfo;
     int retryRestoring;
+
+    bool autoScan;
+    bool autoRestore;
+    bool toggleStatus;
 
     bool locked;
 
@@ -72,6 +83,8 @@ protected:
     afx_msg void OnBnClickedDelete();
     afx_msg void OnBnClickedLock();
     afx_msg void OnBnClickedRestore();
+    afx_msg void OnBnClickedAutoRestore();
+    afx_msg void OnBnClickedAutoScan();
     afx_msg void OnLvnKeydownList(NMHDR *pNMHDR, LRESULT *pResult);
     afx_msg LRESULT OnTrayNotify(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnTaskRestarted(WPARAM wParam, LPARAM lParam);

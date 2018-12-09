@@ -27,13 +27,21 @@ enum
 {
     TIMER_SCAN = 1,
     TIMER_RESTORE,
+    TIMER_STATUS,
+};
+
+enum
+{
+    TIMER_SCAN_INTERVAL = 30 * 1000,
+    TIMER_RESTORE_INTERVAL = 1000,
+    TIMER_STATUS_INTERVAL = 1000,
 };
 
 #define MAX_RESTORING 5
 
-#define DEFAULT_CAPTION _T("Windows Layout Manager")
+#define DEFAULT_CAPTION L"Windows Layout Manager"
 
-unsigned int WM_TASK_RESTARTED = ::RegisterWindowMessage(_T("TaskbarCreated"));
+unsigned int WM_TASK_RESTARTED = ::RegisterWindowMessage(L"TaskbarCreated");
 unsigned int WM_SINGLE_PROCESS = SingleProcess::getMsg();
 
 BOOL MonitorEnumProc(HMONITOR hMonitor, HDC dc, LPRECT rc, LPARAM lParam)
@@ -53,11 +61,14 @@ BOOL MonitorEnumProc(HMONITOR hMonitor, HDC dc, LPRECT rc, LPARAM lParam)
 
 void getMonitorList(MonitorList& list)
 {
-    EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, (LPARAM)&list);
+    EnumDisplayMonitors(nullptr, nullptr, MonitorEnumProc, (LPARAM)&list);
 }
 
 bool operator==(const MonitorList& list1, const MonitorList& list2)
 {
+    if (list1.size() != list2.size())
+        return false;
+
     auto itr1 = list1.cbegin();
     auto itr2 = list2.cbegin();
 
@@ -89,11 +100,12 @@ bool operator!=(const MonitorList& list1, const MonitorList& list2)
 }
 } // namespace anonymous
 
-CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=NULL*/)
+CWindowLayoutManagerDlg::CWindowLayoutManagerDlg(CWnd* pParent /*=nullptr*/)
     : super(IDD_WINDOW_LAYOUT_MANAGER_DIALOG, pParent)
     , saved(false)
     , locked(false)
     , retryRestoring(0)
+    , autoScan(false), autoRestore(false), toggleStatus(false)
 {
     iconApp = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -124,6 +136,8 @@ BEGIN_MESSAGE_MAP(CWindowLayoutManagerDlg, super)
     ON_WM_DISPLAYCHANGE()
     ON_WM_DESTROY()
     ON_WM_TIMER()
+    ON_BN_CLICKED(IDC_AUTO_RESTORE, &CWindowLayoutManagerDlg::OnBnClickedAutoRestore)
+    ON_BN_CLICKED(IDC_AUTO_SCAN, &CWindowLayoutManagerDlg::OnBnClickedAutoScan)
 END_MESSAGE_MAP()
 
 BOOL CWindowLayoutManagerDlg::OnInitDialog()
@@ -137,7 +151,7 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
     ASSERT(IDM_ABOUTBOX < 0xF000);
 
     CMenu *sysMenu = GetSystemMenu(FALSE);
-    if (sysMenu != NULL)
+    if (sysMenu != nullptr)
     {
         BOOL bNameValid;
         CString strAboutMenu;
@@ -173,15 +187,18 @@ BOOL CWindowLayoutManagerDlg::OnInitDialog()
     createTray();
 
     listWindow.SetExtendedStyle(listWindow.GetExtendedStyle() | LVS_EX_FULLROWSELECT);
-    listWindow.InsertColumn(0, _T("Window title"), LVCFMT_LEFT, 300, -1);
-    listWindow.InsertColumn(1, _T("HWND"),         LVCFMT_LEFT, 100, -1);
-    listWindow.InsertColumn(2, _T("PID"),          LVCFMT_LEFT, 100, -1);
-    listWindow.InsertColumn(3, _T("Program"),      LVCFMT_LEFT, 150, -1);
-    listWindow.InsertColumn(4, _T("Position"),     LVCFMT_LEFT, 100, -1);
-    listWindow.InsertColumn(5, _T("Size"),         LVCFMT_LEFT, 100, -1);
-    listWindow.InsertColumn(6, _T("Show status"),  LVCFMT_LEFT, 200, -1);
+    listWindow.InsertColumn(0, L"Window title", LVCFMT_LEFT, 300, -1);
+    listWindow.InsertColumn(1, L"HWND",         LVCFMT_LEFT, 100, -1);
+    listWindow.InsertColumn(2, L"PID",          LVCFMT_LEFT, 100, -1);
+    listWindow.InsertColumn(3, L"Program",      LVCFMT_LEFT, 150, -1);
+    listWindow.InsertColumn(4, L"Position",     LVCFMT_LEFT, 100, -1);
+    listWindow.InsertColumn(5, L"Size",         LVCFMT_LEFT, 100, -1);
+    listWindow.InsertColumn(6, L"Show status",  LVCFMT_LEFT, 200, -1);
 
     lockScan(locked);
+
+    updateStatus();
+    SetTimer(TIMER_STATUS, TIMER_STATUS_INTERVAL, nullptr);
 
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -258,7 +275,7 @@ void CWindowLayoutManagerDlg::createTray()
     unsigned int iconId = IDR_MAINFRAME;
     HICON icon = (HICON)::LoadImage(theApp.m_hInstance, MAKEINTRESOURCE(iconId), IMAGE_ICON, 0, 0, 0);
 
-    if (!systemTray.createTray(GetSafeHwnd(), WM_TRAY_MESSAGE, IDS_TRAY_NOTIFY, _T("Window Layout Manager"), icon))
+    if (!systemTray.createTray(GetSafeHwnd(), WM_TRAY_MESSAGE, IDS_TRAY_NOTIFY, L"Window Layout Manager", icon))
     {
         ::DestroyIcon(icon);
     }
@@ -331,9 +348,9 @@ bool CWindowLayoutManagerDlg::setForceForegroundWindow(HWND hwnd)
 
     HWND foregroundHwnd = ::GetForegroundWindow();
 
-    ::AttachThreadInput(::GetWindowThreadProcessId(foregroundHwnd, NULL), ::GetCurrentThreadId(), TRUE);
+    ::AttachThreadInput(::GetWindowThreadProcessId(foregroundHwnd, nullptr), ::GetCurrentThreadId(), TRUE);
     ret = ::SetForegroundWindow(hwnd);
-    ::AttachThreadInput(::GetWindowThreadProcessId(foregroundHwnd, NULL), ::GetCurrentThreadId(), FALSE);
+    ::AttachThreadInput(::GetWindowThreadProcessId(foregroundHwnd, nullptr), ::GetCurrentThreadId(), FALSE);
 
     return ret;
 }
@@ -356,18 +373,35 @@ BOOL CALLBACK enumWindowsProc(HWND hwnd, LPARAM lParam)
     return TRUE;
 }
 
-void CWindowLayoutManagerDlg::OnBnClickedScan()
+void CWindowLayoutManagerDlg::scan()
 {
     listWindow.SetRedraw(FALSE);
 
     listWindow.DeleteAllItems();
     EnumWindows(enumWindowsProc, (LPARAM)this);
 
-    savedMonitorInfo.list.clear();
-    getMonitorList(savedMonitorInfo.list);
+    MonitorList list;
+    getMonitorList(list);
+
+    if (saved)
+    {
+        bool matched = (list == savedMonitorInfo.list);
+        if (!matched)
+        {
+            autoRestore = false;
+            updateStatus();
+        }
+    }
+
+    savedMonitorInfo.list = list;
     saved = true;
 
     listWindow.SetRedraw();
+}
+
+void CWindowLayoutManagerDlg::OnBnClickedScan()
+{
+    scan();
 }
 
 void CWindowLayoutManagerDlg::addWindow(HWND hwnd)
@@ -423,12 +457,12 @@ void CWindowLayoutManagerDlg::OnLvnGetdispinfoList(NMHDR *pNMHDR, LRESULT *pResu
             break;
 
         case 1:
-            _stprintf_s(itemList.pszText, itemList.cchTextMax, _T("%llX"), reinterpret_cast<intptr_t>(itemListData->hwnd));
+            _stprintf_s(itemList.pszText, itemList.cchTextMax, L"%llX", reinterpret_cast<intptr_t>(itemListData->hwnd));
             break;
 
         case 2:
         {
-            _stprintf_s(itemList.pszText, itemList.cchTextMax, _T("%d"), itemListData->pid);
+            _stprintf_s(itemList.pszText, itemList.cchTextMax, L"%d", itemListData->pid);
             break;
         }
 
@@ -443,7 +477,7 @@ void CWindowLayoutManagerDlg::OnLvnGetdispinfoList(NMHDR *pNMHDR, LRESULT *pResu
             _tcscpy_s(itemList.pszText, itemList.cchTextMax, imageName);
             ::CloseHandle(process);
 
-            TCHAR *split = _tcsrchr(itemList.pszText, _T('\\'));
+            TCHAR *split = _tcsrchr(itemList.pszText, L'\\');
             if (split)
             {
                 size_t charSize = sizeof(itemList.pszText[0]);
@@ -460,18 +494,18 @@ void CWindowLayoutManagerDlg::OnLvnGetdispinfoList(NMHDR *pNMHDR, LRESULT *pResu
 
             switch (itemList.iSubItem)
             {
-            case 4: _stprintf_s(itemList.pszText, itemList.cchTextMax, _T("%d, %d"), rc.left, rc.top); break;
-            case 5: _stprintf_s(itemList.pszText, itemList.cchTextMax, _T("%d x %d"), rc.right - rc.left, rc.bottom - rc.top); break;
+            case 4: _stprintf_s(itemList.pszText, itemList.cchTextMax, L"%d, %d", rc.left, rc.top); break;
+            case 5: _stprintf_s(itemList.pszText, itemList.cchTextMax, L"%d x %d", rc.right - rc.left, rc.bottom - rc.top); break;
             case 6:
-                LPCTSTR showCmdStr = NULL;
-                     if (wp.showCmd == SW_SHOWMINIMIZED) showCmdStr = _T("Minimized");
-                else if (wp.showCmd == SW_SHOWMAXIMIZED) showCmdStr = _T("Maximized");
-                else if (wp.showCmd == SW_HIDE)          showCmdStr = _T("Hided");
+                LPCTSTR showCmdStr = nullptr;
+                     if (wp.showCmd == SW_SHOWMINIMIZED) showCmdStr = L"Minimized";
+                else if (wp.showCmd == SW_SHOWMAXIMIZED) showCmdStr = L"Maximized";
+                else if (wp.showCmd == SW_HIDE)          showCmdStr = L"Hided";
 
                 if (showCmdStr)
-                    _stprintf_s(itemList.pszText, itemList.cchTextMax, _T("%d (%s)"), wp.showCmd, showCmdStr);
+                    _stprintf_s(itemList.pszText, itemList.cchTextMax, L"%d (%s)", wp.showCmd, showCmdStr);
                 else
-                    _stprintf_s(itemList.pszText, itemList.cchTextMax, _T("%d"), wp.showCmd);
+                    _stprintf_s(itemList.pszText, itemList.cchTextMax, L"%d", wp.showCmd);
                 break;
             }
         }
@@ -567,12 +601,12 @@ void CWindowLayoutManagerDlg::lockScan(bool lock)
     if (lock)
     {
         GetDlgItem(IDC_SCAN)->EnableWindow(FALSE);
-        GetDlgItem(IDC_LOCK)->SetWindowText(_T("Un&lock"));
+        GetDlgItem(IDC_LOCK)->SetWindowText(L"Un&lock");
     }
     else
     {
         GetDlgItem(IDC_SCAN)->EnableWindow(TRUE);
-        GetDlgItem(IDC_LOCK)->SetWindowText(_T("&Lock"));
+        GetDlgItem(IDC_LOCK)->SetWindowText(L"&Lock");
     }
 }
 
@@ -584,15 +618,10 @@ void CWindowLayoutManagerDlg::OnBnClickedRestore()
     MonitorList list;
     getMonitorList(list);
 
-    bool matched = false;
-    if (list.size() == savedMonitorInfo.list.size())
-    {
-        matched = (list == savedMonitorInfo.list);
-    }
-
+    bool matched = (list == savedMonitorInfo.list);
     if (!matched)
     {
-        int answer = MessageBox(_T("This is not the monitor layout you scanned! Nevertheless, do you want to restore really?"), DEFAULT_CAPTION, MB_YESNO | MB_ICONWARNING);
+        int answer = MessageBox(L"This is not the monitor layout you scanned! Nevertheless, do you want to restore really?", DEFAULT_CAPTION, MB_YESNO | MB_ICONWARNING);
         if (answer == IDNO)
             return;
     }
@@ -618,21 +647,26 @@ void CWindowLayoutManagerDlg::restore()
 
 void CWindowLayoutManagerDlg::OnDisplayChange(UINT nImageDepth, int cxScreen, int cyScreen)
 {
-    if (saved)
-    {
-        KillTimer(TIMER_RESTORE);
+    KillTimer(TIMER_RESTORE);
 
+    if (saved && autoRestore)
+    {
         retryRestoring = 0;
-        SetTimer(TIMER_RESTORE, 1000, NULL);
+        SetTimer(TIMER_RESTORE, TIMER_RESTORE_INTERVAL, nullptr);
     }
+
+    setAutoScan(false);
 }
 
 void CWindowLayoutManagerDlg::OnTimer(UINT_PTR nIDEvent)
 {
     if (nIDEvent == TIMER_SCAN)
     {
-        timerScan();
-        KillTimer(nIDEvent);
+        if (timerScan())
+        {
+            KillTimer(nIDEvent);
+        }
+
         return;
     }
     else if (nIDEvent == TIMER_RESTORE)
@@ -654,12 +688,30 @@ void CWindowLayoutManagerDlg::OnTimer(UINT_PTR nIDEvent)
 
         return;
     }
+    else if (nIDEvent == TIMER_STATUS)
+    {
+        timerStatus();
+        return;
+    }
 
     super::OnTimer(nIDEvent);
 }
 
-void CWindowLayoutManagerDlg::timerScan()
+bool CWindowLayoutManagerDlg::timerScan()
 {
+    if (saved)
+    {
+        MonitorList list;
+        getMonitorList(list);
+
+        bool matched = (list == savedMonitorInfo.list);
+        if (!matched)
+            return true; // stop timer
+    }
+
+    scan();
+
+    return false;
 }
 
 bool CWindowLayoutManagerDlg::timerRestore()
@@ -667,17 +719,95 @@ bool CWindowLayoutManagerDlg::timerRestore()
     MonitorList list;
     getMonitorList(list);
 
-    if (list.size() == savedMonitorInfo.list.size())
+    bool matched = (list == savedMonitorInfo.list);
+    if (matched)
     {
-        bool matched = (list == savedMonitorInfo.list);
-        if (matched)
-        {
-            restore();
-            return true;
-        }
+        restore();
+
+        autoRestore = false;
+        updateStatus();
+
+        return true; // stop timer
     }
 
     return false;
+}
+
+void CWindowLayoutManagerDlg::timerStatus()
+{
+    updateStatusFlush(toggleStatus);
+    toggleStatus = !toggleStatus;
+}
+
+void CWindowLayoutManagerDlg::updateStatusFlush(bool show)
+{
+    std::wstring status;
+
+    if (autoScan || autoRestore)
+    {
+        if (show)
+        {
+            status = L"Automatic detecting... for ";
+            if (autoScan)
+                status += L"scanning";
+            if (autoRestore)
+            {
+                if (autoScan)
+                    status += L" and ";
+                status += L"restoring";
+            }
+        }
+    }
+    else
+    {
+        status = L"Stopped automatic detection";
+    }
+
+    GetDlgItem(IDC_STATUS)->SetWindowText(status.c_str());
+
+    GetDlgItem(IDC_AUTO_SCAN)->SetWindowText(autoScan ? L"S&top automatic scanning" : L"S&tart automatic scanning");
+    GetDlgItem(IDC_AUTO_RESTORE)->SetWindowText(autoRestore ? L"Unset monitor layout to restore &automatically" : L"Set monitor layout to restore &automatically");
+}
+
+void CWindowLayoutManagerDlg::updateStatus()
+{
+    KillTimer(TIMER_STATUS);
+
+    updateStatusFlush(true);
+
+    toggleStatus = false;
+    SetTimer(TIMER_STATUS, TIMER_STATUS_INTERVAL, nullptr);
+}
+
+// set monitor layout to restore automatically
+void CWindowLayoutManagerDlg::OnBnClickedAutoRestore()
+{
+    autoRestore = !autoRestore;
+
+    updateStatus();
+}
+
+void CWindowLayoutManagerDlg::setAutoScan(bool enable)
+{
+    if (enable)
+    {
+        scan();
+
+        SetTimer(TIMER_SCAN, TIMER_SCAN_INTERVAL, nullptr);
+    }
+    else
+    {
+        KillTimer(TIMER_SCAN);
+    }
+
+    autoScan = enable;
+
+    updateStatus();
+}
+
+void CWindowLayoutManagerDlg::OnBnClickedAutoScan()
+{
+    setAutoScan(!autoScan);
 }
 
 BOOL CWindowLayoutManagerDlg::PreTranslateMessage(MSG* pMsg)
